@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: calorie-ai-server
+    runtime: node
+    rootDir: backend/calorie-ai-server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 22.21.1
+      - key: OPENAI_MODEL
+        value: gpt-5.2
+      - key: OPENAI_API_KEY
+        sync: false
