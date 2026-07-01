@@ -30,12 +30,6 @@ android {
 
     flavorDimensions += "app"
     productFlavors {
-        create("dartat") {
-            dimension = "app"
-            applicationId = "com.dkonak.dartat"
-            versionCode = 7
-            versionName = "1.0.6"
-        }
         create("blockblast") {
             dimension = "app"
             applicationId = "com.dkonak.blockblast"
@@ -53,12 +47,6 @@ android {
             applicationId = "com.dkonak.aboneliktakibi"
             versionCode = 18
             versionName = "1.0.17"
-        }
-        create("galeritakip") {
-            dimension = "app"
-            applicationId = "com.dkonak.galeritakip"
-            versionCode = 6
-            versionName = "1.0.5"
         }
     }
 

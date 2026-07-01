@@ -9,7 +9,6 @@
 ## Reklam Kontrolu
 - Telefon testinde sorun cikarmamasi icin Google Ads SDK su an devre disi.
 - Oyundaki odullu reklam butonlari su an yerel odul simulatörü gibi calisir.
-- Play Store'a gercek reklamla cikilacaksa AdMob SDK tekrar eklenecek ve `app/src/main/res/values/strings.xml` icindeki `admob_app_id` / `rewarded_ad_unit_id` gercek kimliklerle kullanilacak.
 - Gercek reklam entegrasyonu yapildiktan sonra Play Console'da "reklam iceriyor" secenegi isaretlenecek.
 
 ## Play Store Listeleme
