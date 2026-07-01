@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.dkonak.aboneliktakibi
 
 import org.junit.Test
 

@@ -22,8 +22,8 @@ android {
         applicationId = "com.dkonak.dartat"
         minSdk = 24
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 6
+        versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,6 +33,8 @@ android {
         create("dartat") {
             dimension = "app"
             applicationId = "com.dkonak.dartat"
+            versionCode = 7
+            versionName = "1.0.6"
         }
         create("blockblast") {
             dimension = "app"
@@ -45,6 +47,18 @@ android {
                 .orElse("http://10.0.2.2:8787/analyze-food")
                 .get()
             buildConfigField("String", "CALORIE_AI_ENDPOINT", "\"$calorieAiEndpoint\"")
+        }
+        create("aboneliktakibi") {
+            dimension = "app"
+            applicationId = "com.dkonak.aboneliktakibi"
+            versionCode = 18
+            versionName = "1.0.17"
+        }
+        create("galeritakip") {
+            dimension = "app"
+            applicationId = "com.dkonak.galeritakip"
+            versionCode = 6
+            versionName = "1.0.5"
         }
     }
 
@@ -80,6 +94,12 @@ android {
 }
 
 dependencies {
+    implementation(platform("com.google.firebase:firebase-bom:34.15.0"))
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.firebase:firebase-firestore")
+    implementation("com.google.firebase:firebase-storage")
+    implementation("com.google.android.gms:play-services-auth:21.4.0")
+    implementation("com.google.android.gms:play-services-ads:25.4.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

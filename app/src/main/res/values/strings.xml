@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Calculate Calories</string>
-    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="rewarded_ad_unit_id">ca-app-pub-3940256099942544/5224354917</string>
+    <string name="app_name">Block Blast</string>
+    <string name="admob_app_id">ca-app-pub-6199570395675233~8559250512</string>
+    <string name="rewarded_ad_unit_id">ca-app-pub-6199570395675233/3770415113</string>
 </resources>

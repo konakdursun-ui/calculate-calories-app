@@ -16,7 +16,10 @@ import android.util.Base64;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
+import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -41,11 +44,50 @@ public class MainActivity extends Activity {
     private static final int REQUEST_CAMERA = 101;
     private static final int REQUEST_CAPTURE = 201;
     private static final int REQUEST_PICK_IMAGE = 202;
+    private static final int COLOR_BACKGROUND = Color.rgb(232, 255, 240);
+    private static final int COLOR_SURFACE = Color.WHITE;
+    private static final int COLOR_MINT = Color.rgb(209, 254, 229);
+    private static final int COLOR_MINT_SOFT = Color.rgb(204, 248, 223);
+    private static final int COLOR_PRIMARY = Color.rgb(15, 82, 56);
+    private static final int COLOR_PRIMARY_CONTAINER = Color.rgb(45, 106, 79);
+    private static final int COLOR_TEXT = Color.rgb(0, 33, 20);
+    private static final int COLOR_MUTED = Color.rgb(64, 73, 67);
+    private static final int COLOR_CALORIE = Color.rgb(188, 22, 45);
+    private static final int SCREEN_ANALYSIS = 0;
+    private static final int SCREEN_SETTINGS = 1;
+    private static final int SCREEN_ACCOUNT = 2;
 
+    private LinearLayout analysisContent;
+    private LinearLayout settingsContent;
+    private LinearLayout accountContent;
+    private LinearLayout bottomNav;
+    private TextView appTitleText;
+    private TextView settingsHeadingText;
+    private TextView languageTitleText;
+    private TextView languageNoteText;
+    private Button turkishButton;
+    private Button englishButton;
+    private TextView accountHeadingText;
+    private TextView freeTitleText;
+    private TextView freeBadgeText;
+    private TextView freeDescriptionText;
+    private TextView premiumTitleText;
+    private TextView premiumBadgeText;
+    private TextView premiumDescriptionText;
+    private Button subscribeButton;
+    private TextView analysisTab;
+    private TextView settingsTab;
+    private TextView accountTab;
     private ImageView foodImage;
+    private FrameLayout photoFrame;
+    private LinearLayout uploadPlaceholder;
+    private TextView homeSubtitle;
+    private LinearLayout actionsLayout;
     private TextView statusText;
     private LinearLayout lockedPanel;
+    private LinearLayout analyzingPanel;
     private LinearLayout resultPanel;
+    private TextView resultTitleText;
     private TextView foodNameText;
     private TextView confidenceText;
     private TextView caloriesText;
@@ -56,115 +98,275 @@ public class MainActivity extends Activity {
     private TextView insightText;
     private SeekBar portionSeekBar;
     private Button watchAdButton;
+    private Button newPhotoButton;
 
     private FoodEstimate currentEstimate;
     private Bitmap currentFoodBitmap;
     private int portionGrams = 250;
     private boolean resultUnlocked;
     private boolean aiAnalysisInProgress;
+    private boolean analysisPrepared;
+    private int currentScreen = SCREEN_ANALYSIS;
+    private boolean english;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Window window = getWindow();
+        window.setStatusBarColor(COLOR_BACKGROUND);
+        window.setNavigationBarColor(Color.WHITE);
         setContentView(createContentView());
         showEmptyState();
     }
 
     private View createContentView() {
+        LinearLayout screen = new LinearLayout(this);
+        screen.setOrientation(LinearLayout.VERTICAL);
+        screen.setBackgroundColor(Color.WHITE);
+
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
-        scrollView.setBackgroundColor(Color.rgb(247, 249, 244));
+        scrollView.setBackgroundColor(Color.WHITE);
+        screen.addView(scrollView, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+        ));
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(24), dp(20), dp(24));
+        root.setPadding(dp(16), 0, dp(16), dp(28));
         scrollView.addView(root, new ScrollView.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
         ));
 
-        TextView title = text("Calculate Calories", 30, Color.rgb(27, 45, 35), Typeface.BOLD);
-        root.addView(title);
+        LinearLayout topBar = new LinearLayout(this);
+        topBar.setOrientation(LinearLayout.VERTICAL);
+        topBar.setGravity(Gravity.CENTER);
+        topBar.setPadding(0, dp(30), 0, dp(14));
+        topBar.setBackgroundColor(COLOR_BACKGROUND);
+        root.addView(topBar, matchWrapParams());
 
-        TextView subtitle = text("Yemeğinin fotoğrafını çek, porsiyonu seç ve yaklaşık kalori, protein, karbonhidrat ve yağ değerlerini gör.", 15, Color.rgb(84, 101, 89), Typeface.NORMAL);
-        subtitle.setPadding(0, dp(8), 0, dp(18));
-        root.addView(subtitle);
+        appTitleText = text("", 20, COLOR_PRIMARY, Typeface.BOLD);
+        appTitleText.setGravity(Gravity.CENTER);
+        topBar.addView(appTitleText, matchWrapParams());
+
+        analysisContent = new LinearLayout(this);
+        analysisContent.setOrientation(LinearLayout.VERTICAL);
+        root.addView(analysisContent, matchWrapParams());
+
+        homeSubtitle = text("", 18, COLOR_MUTED, Typeface.NORMAL);
+        homeSubtitle.setGravity(Gravity.CENTER);
+        homeSubtitle.setPadding(dp(10), dp(20), dp(10), dp(18));
+        analysisContent.addView(homeSubtitle);
+
+        photoFrame = new FrameLayout(this);
+        photoFrame.setBackground(makeRoundRect(COLOR_MINT, dp(24), Color.rgb(149, 212, 179), dp(2), dp(9)));
+        LinearLayout.LayoutParams photoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(250)
+        );
+        photoParams.setMargins(0, 0, 0, dp(16));
+        analysisContent.addView(photoFrame, photoParams);
 
         foodImage = new ImageView(this);
         foodImage.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        foodImage.setBackground(makeRoundRect(Color.rgb(229, 235, 222), dp(18), 0));
-        root.addView(foodImage, new LinearLayout.LayoutParams(
+        foodImage.setBackground(makeRoundRect(COLOR_MINT, dp(24), 0));
+        photoFrame.addView(foodImage, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(260)
+                ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setPadding(0, dp(16), 0, dp(14));
-        root.addView(actions);
+        uploadPlaceholder = new LinearLayout(this);
+        uploadPlaceholder.setOrientation(LinearLayout.VERTICAL);
+        uploadPlaceholder.setGravity(Gravity.CENTER);
+        uploadPlaceholder.setPadding(dp(24), dp(24), dp(24), dp(24));
+        photoFrame.addView(uploadPlaceholder, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
 
-        Button cameraButton = actionButton("Fotoğraf çek");
+        TextView cameraGlyph = text("▣+", 42, Color.rgb(88, 143, 119), Typeface.BOLD);
+        cameraGlyph.setGravity(Gravity.CENTER);
+        uploadPlaceholder.addView(cameraGlyph);
+
+        TextView uploadTitle = text("", 15, Color.rgb(88, 143, 119), Typeface.BOLD);
+        uploadTitle.setTag("upload_title");
+        uploadTitle.setGravity(Gravity.CENTER);
+        uploadTitle.setPadding(0, dp(10), 0, dp(8));
+        uploadPlaceholder.addView(uploadTitle);
+
+        TextView uploadHint = text("", 13, Color.rgb(115, 157, 137), Typeface.NORMAL);
+        uploadHint.setTag("upload_hint");
+        uploadHint.setGravity(Gravity.CENTER);
+        uploadPlaceholder.addView(uploadHint);
+
+        actionsLayout = new LinearLayout(this);
+        actionsLayout.setOrientation(LinearLayout.HORIZONTAL);
+        actionsLayout.setPadding(0, 0, 0, dp(8));
+        analysisContent.addView(actionsLayout);
+
+        Button cameraButton = actionButton("");
+        cameraButton.setTag("camera_button");
         cameraButton.setOnClickListener(v -> openCamera());
-        actions.addView(cameraButton, weightedButtonParams(0, dp(8)));
+        actionsLayout.addView(cameraButton, weightedButtonParams(0, dp(8), dp(76)));
 
-        Button galleryButton = actionButton("Galeriden seç");
+        Button galleryButton = secondaryButton("");
+        galleryButton.setTag("gallery_button");
         galleryButton.setOnClickListener(v -> openGallery());
-        actions.addView(galleryButton, weightedButtonParams(dp(8), 0));
+        actionsLayout.addView(galleryButton, weightedButtonParams(dp(8), 0, dp(76)));
 
-        statusText = text("", 14, Color.rgb(94, 103, 96), Typeface.NORMAL);
+        statusText = text("", 15, COLOR_MUTED, Typeface.NORMAL);
         statusText.setGravity(Gravity.CENTER);
-        statusText.setPadding(dp(12), dp(10), dp(12), dp(10));
-        root.addView(statusText, matchWrapParams());
+        statusText.setPadding(dp(12), dp(10), dp(12), dp(12));
+        analysisContent.addView(statusText, matchWrapParams());
+
+        analyzingPanel = new LinearLayout(this);
+        analyzingPanel.setOrientation(LinearLayout.VERTICAL);
+        analyzingPanel.setGravity(Gravity.CENTER_HORIZONTAL);
+        analyzingPanel.setPadding(dp(28), dp(38), dp(28), dp(38));
+        analyzingPanel.setBackground(makeRoundRect(COLOR_SURFACE, dp(28), 0));
+        LinearLayout.LayoutParams analyzingParams = matchWrapParams();
+        analyzingParams.setMargins(0, dp(16), 0, 0);
+        analysisContent.addView(analyzingPanel, analyzingParams);
+
+        TextView analyzingGlyph = text("↻", 42, COLOR_PRIMARY, Typeface.BOLD);
+        analyzingGlyph.setGravity(Gravity.CENTER);
+        analyzingGlyph.setBackground(makeRoundRect(COLOR_MINT, dp(32), 0));
+        analyzingPanel.addView(analyzingGlyph, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        TextView analyzingTitle = text("", 28, COLOR_TEXT, Typeface.BOLD);
+        analyzingTitle.setTag("analyzing_title");
+        analyzingTitle.setGravity(Gravity.CENTER);
+        analyzingTitle.setPadding(0, dp(24), 0, dp(12));
+        analyzingPanel.addView(analyzingTitle);
+
+        TextView analyzingBody = text("", 18, COLOR_MUTED, Typeface.NORMAL);
+        analyzingBody.setTag("analyzing_body");
+        analyzingBody.setGravity(Gravity.CENTER);
+        analyzingPanel.addView(analyzingBody);
 
         lockedPanel = new LinearLayout(this);
         lockedPanel.setOrientation(LinearLayout.VERTICAL);
-        lockedPanel.setPadding(dp(18), dp(18), dp(18), dp(18));
-        lockedPanel.setBackground(makeRoundRect(Color.WHITE, dp(18), Color.rgb(218, 225, 213)));
+        lockedPanel.setGravity(Gravity.CENTER_HORIZONTAL);
+        lockedPanel.setPadding(dp(24), dp(28), dp(24), dp(28));
+        lockedPanel.setBackground(makeRoundRect(COLOR_SURFACE, dp(28), 0));
         LinearLayout.LayoutParams lockedParams = matchWrapParams();
         lockedParams.setMargins(0, dp(16), 0, 0);
-        root.addView(lockedPanel, lockedParams);
+        analysisContent.addView(lockedPanel, lockedParams);
 
-        TextView lockedTitle = text("Sonuç hazır", 22, Color.rgb(29, 48, 37), Typeface.BOLD);
+        TextView checkGlyph = text("✓", 40, COLOR_PRIMARY, Typeface.BOLD);
+        checkGlyph.setGravity(Gravity.CENTER);
+        checkGlyph.setBackground(makeRoundRect(Color.rgb(192, 248, 217), dp(32), 0));
+        lockedPanel.addView(checkGlyph, new LinearLayout.LayoutParams(dp(64), dp(64)));
+
+        TextView lockedTitle = text("", 28, COLOR_TEXT, Typeface.BOLD);
+        lockedTitle.setTag("locked_title");
+        lockedTitle.setGravity(Gravity.CENTER);
+        lockedTitle.setPadding(0, dp(18), 0, dp(10));
         lockedPanel.addView(lockedTitle);
 
-        TextView lockedBody = text("Kalori, protein, karbonhidrat ve yağ tahminini görmek için kısa reklamı izle.", 14, Color.rgb(79, 91, 82), Typeface.NORMAL);
-        lockedBody.setPadding(0, dp(6), 0, dp(14));
+        TextView lockedBody = text("", 18, COLOR_MUTED, Typeface.NORMAL);
+        lockedBody.setTag("locked_body");
+        lockedBody.setGravity(Gravity.CENTER);
+        lockedBody.setPadding(0, 0, 0, dp(18));
         lockedPanel.addView(lockedBody);
 
-        watchAdButton = actionButton("Reklam izle ve sonucu gör");
+        watchAdButton = actionButton("");
+        watchAdButton.setTag("watch_ad_button");
         watchAdButton.setOnClickListener(v -> unlockResultAfterAd());
         lockedPanel.addView(watchAdButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
-                dp(52)
+                dp(58)
         ));
+
+        TextView adNote = text("", 14, COLOR_MUTED, Typeface.NORMAL);
+        adNote.setTag("ad_note");
+        adNote.setGravity(Gravity.CENTER);
+        adNote.setPadding(0, dp(16), 0, 0);
+        lockedPanel.addView(adNote);
 
         resultPanel = new LinearLayout(this);
         resultPanel.setOrientation(LinearLayout.VERTICAL);
-        resultPanel.setPadding(dp(18), dp(18), dp(18), dp(18));
-        resultPanel.setBackground(makeRoundRect(Color.WHITE, dp(18), Color.rgb(218, 225, 213)));
+        resultPanel.setPadding(0, 0, 0, 0);
         LinearLayout.LayoutParams panelParams = matchWrapParams();
-        panelParams.setMargins(0, dp(16), 0, 0);
-        root.addView(resultPanel, panelParams);
+        panelParams.setMargins(0, 0, 0, 0);
+        analysisContent.addView(resultPanel, panelParams);
 
-        foodNameText = text("", 22, Color.rgb(29, 48, 37), Typeface.BOLD);
-        resultPanel.addView(foodNameText);
+        resultTitleText = text("", 1, COLOR_PRIMARY, Typeface.BOLD);
+        resultTitleText.setGravity(Gravity.CENTER);
+        resultTitleText.setPadding(0, 0, 0, 0);
+        resultPanel.addView(resultTitleText);
 
-        confidenceText = text("", 14, Color.rgb(92, 103, 94), Typeface.NORMAL);
-        confidenceText.setPadding(0, dp(4), 0, dp(14));
-        resultPanel.addView(confidenceText);
+        confidenceText = text("", 1, COLOR_PRIMARY, Typeface.BOLD);
+        confidenceText.setGravity(Gravity.CENTER);
+        confidenceText.setPadding(0, 0, 0, 0);
+        LinearLayout.LayoutParams confidenceParams = new LinearLayout.LayoutParams(
+                1,
+                1
+        );
+        confidenceParams.gravity = Gravity.START;
+        confidenceParams.setMargins(0, 0, 0, 0);
+        resultPanel.addView(confidenceText, confidenceParams);
+
+        LinearLayout calorieCard = new LinearLayout(this);
+        calorieCard.setOrientation(LinearLayout.VERTICAL);
+        calorieCard.setGravity(Gravity.CENTER);
+        calorieCard.setPadding(dp(14), dp(22), dp(14), dp(22));
+        calorieCard.setBackground(makeRoundRect(COLOR_SURFACE, dp(16), 0));
+        LinearLayout.LayoutParams calorieParams = matchWrapParams();
+        calorieParams.setMargins(0, dp(12), 0, dp(16));
+        resultPanel.addView(calorieCard, calorieParams);
+
+        foodNameText = text("", 24, COLOR_TEXT, Typeface.BOLD);
+        foodNameText.setGravity(Gravity.CENTER);
+        calorieCard.addView(foodNameText);
+
+        caloriesText = text("", 40, COLOR_CALORIE, Typeface.BOLD);
+        caloriesText.setGravity(Gravity.CENTER);
+        caloriesText.setPadding(0, dp(10), 0, 0);
+        calorieCard.addView(caloriesText);
 
         LinearLayout macros = new LinearLayout(this);
-        macros.setOrientation(LinearLayout.VERTICAL);
+        macros.setOrientation(LinearLayout.HORIZONTAL);
         resultPanel.addView(macros);
 
-        caloriesText = addMetric(macros, "Kalori", Color.rgb(215, 89, 48));
-        proteinText = addMetric(macros, "Protein", Color.rgb(34, 113, 83));
-        carbsText = addMetric(macros, "Karbonhidrat", Color.rgb(55, 95, 164));
-        fatText = addMetric(macros, "Yağ", Color.rgb(142, 97, 42));
+        proteinText = addMacroCard(macros, "◉", "Protein", Color.rgb(206, 233, 211), COLOR_PRIMARY, 0, dp(8));
+        carbsText = addMacroCard(macros, "∴", "Karb", Color.rgb(255, 243, 224), Color.rgb(230, 81, 0), dp(4), dp(4));
+        fatText = addMacroCard(macros, "♧", "Yağ", Color.rgb(255, 248, 225), Color.rgb(245, 127, 23), dp(8), 0);
 
-        portionText = text("", 15, Color.rgb(41, 56, 46), Typeface.BOLD);
-        portionText.setPadding(0, dp(18), 0, dp(2));
-        resultPanel.addView(portionText);
+        LinearLayout portionCard = new LinearLayout(this);
+        portionCard.setOrientation(LinearLayout.HORIZONTAL);
+        portionCard.setGravity(Gravity.CENTER_VERTICAL);
+        portionCard.setPadding(dp(12), dp(14), dp(12), dp(14));
+        portionCard.setBackground(makeRoundRect(COLOR_SURFACE, dp(16), 0));
+        LinearLayout.LayoutParams portionParams = matchWrapParams();
+        portionParams.setMargins(0, dp(18), 0, dp(10));
+        resultPanel.addView(portionCard, portionParams);
+
+        TextView portionIcon = text("♨", 20, COLOR_PRIMARY, Typeface.BOLD);
+        portionIcon.setGravity(Gravity.CENTER);
+        portionIcon.setBackground(makeRoundRect(COLOR_MINT, dp(10), 0));
+        portionCard.addView(portionIcon, new LinearLayout.LayoutParams(dp(44), dp(44)));
+
+        LinearLayout portionLabels = new LinearLayout(this);
+        portionLabels.setOrientation(LinearLayout.VERTICAL);
+        portionLabels.setPadding(dp(10), 0, 0, 0);
+        portionCard.addView(portionLabels, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView portionTitle = text("", 18, COLOR_TEXT, Typeface.NORMAL);
+        portionTitle.setTag("portion_title");
+        portionLabels.addView(portionTitle);
+
+        TextView portionSub = text("", 12, COLOR_MUTED, Typeface.NORMAL);
+        portionSub.setTag("portion_subtitle");
+        portionLabels.addView(portionSub);
+
+        portionText = text("", 18, COLOR_PRIMARY, Typeface.BOLD);
+        portionText.setGravity(Gravity.CENTER);
+        portionText.setBackground(makeRoundRect(COLOR_MINT, dp(10), 0));
+        portionCard.addView(portionText, new LinearLayout.LayoutParams(dp(120), dp(46)));
 
         portionSeekBar = new SeekBar(this);
         portionSeekBar.setMax(450);
@@ -186,23 +388,293 @@ public class MainActivity extends Activity {
         });
         resultPanel.addView(portionSeekBar, matchWrapParams());
 
-        insightText = text("", 14, Color.rgb(79, 91, 82), Typeface.NORMAL);
-        insightText.setPadding(0, dp(14), 0, 0);
-        resultPanel.addView(insightText);
+        LinearLayout analysisCard = new LinearLayout(this);
+        analysisCard.setOrientation(LinearLayout.VERTICAL);
+        analysisCard.setPadding(dp(18), dp(18), dp(18), dp(18));
+        analysisCard.setBackground(makeRoundRect(COLOR_SURFACE, dp(16), 0));
+        LinearLayout.LayoutParams analysisParams = matchWrapParams();
+        analysisParams.setMargins(0, dp(18), 0, dp(28));
+        resultPanel.addView(analysisCard, analysisParams);
 
-        return scrollView;
+        TextView analysisTitle = text("", 16, COLOR_PRIMARY, Typeface.BOLD);
+        analysisTitle.setTag("ai_analysis_title");
+        analysisTitle.setPadding(0, 0, 0, dp(12));
+        analysisCard.addView(analysisTitle);
+
+        insightText = text("", 15, COLOR_MUTED, Typeface.NORMAL);
+        analysisCard.addView(insightText);
+
+        newPhotoButton = actionButton("");
+        newPhotoButton.setTag("new_photo_button");
+        newPhotoButton.setOnClickListener(v -> showEmptyState());
+        LinearLayout.LayoutParams newPhotoParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(58)
+        );
+        newPhotoParams.setMargins(0, 0, 0, dp(96));
+        resultPanel.addView(newPhotoButton, newPhotoParams);
+
+        settingsContent = createSettingsContent();
+        root.addView(settingsContent, matchWrapParams());
+
+        accountContent = createAccountContent();
+        root.addView(accountContent, matchWrapParams());
+
+        bottomNav = new LinearLayout(this);
+        bottomNav.setOrientation(LinearLayout.HORIZONTAL);
+        bottomNav.setGravity(Gravity.CENTER);
+        bottomNav.setPadding(dp(10), dp(8), dp(10), dp(8));
+        bottomNav.setBackgroundColor(COLOR_BACKGROUND);
+        screen.addView(bottomNav, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(76)
+        ));
+
+        analysisTab = addBottomTab(bottomNav, "Analiz", SCREEN_ANALYSIS);
+        settingsTab = addBottomTab(bottomNav, "Ayarlar", SCREEN_SETTINGS);
+        accountTab = addBottomTab(bottomNav, "Hesabım", SCREEN_ACCOUNT);
+        bottomNav.setOnApplyWindowInsetsListener((view, insets) -> {
+            int bottom = 0;
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                bottom = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+            } else if (android.os.Build.VERSION.SDK_INT >= 20) {
+                bottom = insets.getSystemWindowInsetBottom();
+            }
+            view.setPadding(dp(10), dp(8), dp(10), dp(8) + bottom);
+            ViewGroup.LayoutParams params = view.getLayoutParams();
+            params.height = dp(76) + bottom;
+            view.setLayoutParams(params);
+            return insets;
+        });
+
+        updateLanguageTexts();
+        switchScreen(SCREEN_ANALYSIS);
+        return screen;
     }
 
     private void showEmptyState() {
+        switchScreen(SCREEN_ANALYSIS);
         foodImage.setImageDrawable(null);
-        statusText.setText("Başlamak için tabağı iyi ışıkta, mümkünse üstten çek. Fotoğraf hazır olunca sonucu reklamdan sonra açacağız.");
+        LinearLayout.LayoutParams photoParams = (LinearLayout.LayoutParams) photoFrame.getLayoutParams();
+        photoParams.height = dp(250);
+        photoParams.setMargins(0, 0, 0, dp(16));
+        photoFrame.setLayoutParams(photoParams);
+        photoFrame.setVisibility(View.VISIBLE);
+        uploadPlaceholder.setVisibility(View.VISIBLE);
+        homeSubtitle.setVisibility(View.VISIBLE);
+        actionsLayout.setVisibility(View.VISIBLE);
+        statusText.setText(english ? "ⓘ Results are estimates, not medical advice." : "ⓘ Sonuçlar tahminidir, tıbbi tavsiye değildir.");
+        statusText.setVisibility(View.VISIBLE);
         currentEstimate = null;
         currentFoodBitmap = null;
         resultUnlocked = false;
         aiAnalysisInProgress = false;
+        analysisPrepared = false;
+        analyzingPanel.setVisibility(View.GONE);
         lockedPanel.setVisibility(View.GONE);
         resultPanel.setVisibility(View.GONE);
         renderEstimate();
+    }
+
+    private LinearLayout createSettingsContent() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(0, dp(18), 0, dp(24));
+
+        settingsHeadingText = text("", 26, COLOR_TEXT, Typeface.BOLD);
+        settingsHeadingText.setPadding(0, 0, 0, dp(16));
+        content.addView(settingsHeadingText);
+
+        LinearLayout languageCard = new LinearLayout(this);
+        languageCard.setOrientation(LinearLayout.VERTICAL);
+        languageCard.setPadding(dp(18), dp(18), dp(18), dp(18));
+        languageCard.setBackground(makeRoundRect(COLOR_SURFACE, dp(18), COLOR_MINT_SOFT));
+        content.addView(languageCard, matchWrapParams());
+
+        languageTitleText = text("", 20, COLOR_PRIMARY, Typeface.BOLD);
+        languageCard.addView(languageTitleText);
+
+        languageNoteText = text("", 14, COLOR_MUTED, Typeface.NORMAL);
+        languageNoteText.setPadding(0, dp(6), 0, dp(16));
+        languageCard.addView(languageNoteText);
+
+        turkishButton = secondaryButton("");
+        turkishButton.setOnClickListener(v -> {
+            english = false;
+            updateLanguageTexts();
+            Toast.makeText(this, "Türkçe seçildi.", Toast.LENGTH_SHORT).show();
+        });
+        languageCard.addView(turkishButton, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
+        ));
+
+        englishButton = secondaryButton("");
+        englishButton.setOnClickListener(v -> {
+            english = true;
+            updateLanguageTexts();
+            Toast.makeText(this, "English selected.", Toast.LENGTH_SHORT).show();
+        });
+        LinearLayout.LayoutParams englishParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(52)
+        );
+        englishParams.setMargins(0, dp(10), 0, 0);
+        languageCard.addView(englishButton, englishParams);
+
+        return content;
+    }
+
+    private LinearLayout createAccountContent() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(0, dp(18), 0, dp(24));
+
+        accountHeadingText = text("", 26, COLOR_TEXT, Typeface.BOLD);
+        accountHeadingText.setPadding(0, 0, 0, dp(16));
+        content.addView(accountHeadingText);
+
+        LinearLayout freeCard = planCard(true);
+        content.addView(freeCard, matchWrapParams());
+
+        LinearLayout.LayoutParams paidParams = matchWrapParams();
+        paidParams.setMargins(0, dp(14), 0, 0);
+        LinearLayout paidCard = planCard(false);
+        content.addView(paidCard, paidParams);
+
+        subscribeButton = actionButton("");
+        subscribeButton.setEnabled(false);
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(54)
+        );
+        buttonParams.setMargins(0, dp(16), 0, 0);
+        content.addView(subscribeButton, buttonParams);
+
+        return content;
+    }
+
+    private LinearLayout planCard(boolean freePlan) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(dp(18), dp(18), dp(18), dp(18));
+        card.setBackground(makeRoundRect(COLOR_SURFACE, dp(18), COLOR_MINT_SOFT));
+
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        card.addView(row, matchWrapParams());
+
+        TextView titleView = text("", 20, COLOR_PRIMARY, Typeface.BOLD);
+        row.addView(titleView, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView badgeView = text("", 13, COLOR_PRIMARY, Typeface.BOLD);
+        badgeView.setGravity(Gravity.CENTER);
+        badgeView.setPadding(dp(10), dp(6), dp(10), dp(6));
+        badgeView.setBackground(makeRoundRect(COLOR_MINT, dp(16), 0));
+        row.addView(badgeView);
+
+        TextView descriptionView = text("", 15, COLOR_MUTED, Typeface.NORMAL);
+        descriptionView.setPadding(0, dp(10), 0, 0);
+        card.addView(descriptionView);
+        if (freePlan) {
+            freeTitleText = titleView;
+            freeBadgeText = badgeView;
+            freeDescriptionText = descriptionView;
+        } else {
+            premiumTitleText = titleView;
+            premiumBadgeText = badgeView;
+            premiumDescriptionText = descriptionView;
+        }
+        return card;
+    }
+
+    private TextView addBottomTab(LinearLayout parent, String label, int screenId) {
+        TextView tab = text(label, 15, COLOR_MUTED, Typeface.BOLD);
+        tab.setGravity(Gravity.CENTER);
+        tab.setPadding(dp(8), dp(10), dp(8), dp(10));
+        tab.setOnClickListener(v -> switchScreen(screenId));
+        parent.addView(tab, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        return tab;
+    }
+
+    private void switchScreen(int screenId) {
+        currentScreen = screenId;
+        analysisContent.setVisibility(screenId == SCREEN_ANALYSIS ? View.VISIBLE : View.GONE);
+        settingsContent.setVisibility(screenId == SCREEN_SETTINGS ? View.VISIBLE : View.GONE);
+        accountContent.setVisibility(screenId == SCREEN_ACCOUNT ? View.VISIBLE : View.GONE);
+        styleBottomTab(analysisTab, screenId == SCREEN_ANALYSIS);
+        styleBottomTab(settingsTab, screenId == SCREEN_SETTINGS);
+        styleBottomTab(accountTab, screenId == SCREEN_ACCOUNT);
+    }
+
+    private void styleBottomTab(TextView tab, boolean selected) {
+        if (tab == null) {
+            return;
+        }
+        tab.setTextColor(selected ? COLOR_PRIMARY : COLOR_MUTED);
+        tab.setBackground(selected ? makeRoundRect(Color.rgb(204, 230, 208), dp(24), 0) : null);
+    }
+
+    private void updateLanguageTexts() {
+        appTitleText.setText(english ? "Free AI Calorie Calculator" : "Ücretsiz AI Kalori Hesapla");
+        homeSubtitle.setText(english
+                ? "Take a food photo and let AI estimate\ncalories and macros."
+                : "Yemeğinin fotoğrafını çek, AI kalori ve\nmakro değerlerini tahmin etsin.");
+        setTaggedText(analysisContent, "upload_title", english ? "Add your food photo here" : "Yemek fotoğrafınızı buraya ekleyin");
+        setTaggedText(analysisContent, "upload_hint", english ? "Use bright lighting" : "Aydınlık ortamda çekim yapın");
+        setTaggedText(analysisContent, "camera_button", english ? "▣\nTake Photo" : "▣\nFotoğraf Çek");
+        setTaggedText(analysisContent, "gallery_button", english ? "▧\nChoose Gallery" : "▧\nGaleriden Seç");
+        setTaggedText(analysisContent, "analyzing_title", english ? "AI is analyzing" : "AI analiz ediyor");
+        setTaggedText(analysisContent, "analyzing_body",
+                english ? "Your photo is being checked. You can unlock the result when it is ready."
+                        : "Fotoğrafınız inceleniyor. Sonuç hazır olduğunda reklam izleyerek açabilirsiniz.");
+        setTaggedText(analysisContent, "locked_title", english ? "Analysis ready" : "Analiz hazır");
+        setTaggedText(analysisContent, "locked_body",
+                english ? "Watch a short ad to see the AI estimate."
+                        : "Sonucu görmek için kısa bir reklam izleyin. Reklamdan sonra AI tahmini gösterilecektir.");
+        setTaggedText(analysisContent, "watch_ad_button", english ? "▶  Watch Ad and See Result" : "▶  Reklam İzle ve Sonucu Gör");
+        setTaggedText(analysisContent, "ad_note", english ? "ⓘ Detailed AI analysis appears after the ad." : "ⓘ Reklamdan sonra detaylı AI analizi sunulacaktır.");
+        setTaggedText(analysisContent, "portion_title", english ? "Portion" : "Porsiyon");
+        setTaggedText(analysisContent, "portion_subtitle", english ? "Estimated amount" : "Tahmini miktar");
+        setTaggedText(analysisContent, "ai_analysis_title", english ? "⚙  AI Analysis" : "⚙  AI Analizi");
+        setTaggedText(analysisContent, "new_photo_button", english ? "▣  Analyze New Photo" : "▣  Yeni Fotoğraf Analiz Et");
+
+        statusText.setText(english ? "ⓘ Results are estimates, not medical advice." : "ⓘ Sonuçlar tahminidir, tıbbi tavsiye değildir.");
+        settingsHeadingText.setText(english ? "Settings" : "Ayarlar");
+        languageTitleText.setText(english ? "Language" : "Dil Seçenekleri");
+        languageNoteText.setText(english ? "Choose the language for the app." : "Uygulama metinleri için tercih ettiğin dili seç.");
+        turkishButton.setText("Türkçe");
+        englishButton.setText("English");
+        accountHeadingText.setText(english ? "Account" : "Hesabım");
+        freeTitleText.setText(english ? "Free" : "Ücretsiz");
+        freeBadgeText.setText(english ? "Active" : "Aktif plan");
+        freeDescriptionText.setText(english ? "Watch an ad to unlock each AI analysis." : "Reklam izleyerek AI analiz sonucunu gör.");
+        premiumTitleText.setText(english ? "Ad-free Subscription" : "Reklamsız Abonelik");
+        premiumBadgeText.setText(english ? "Soon" : "Yakında");
+        premiumDescriptionText.setText(english ? "Analyze without ads for $2 per month." : "Ayda 2 dolar ile reklamsız analiz yap.");
+        subscribeButton.setText(english ? "Subscription link coming soon" : "Abonelik bağlantısı yakında");
+        analysisTab.setText(english ? "Analysis" : "Analiz");
+        settingsTab.setText(english ? "Settings" : "Ayarlar");
+        accountTab.setText(english ? "Account" : "Hesabım");
+
+        if (currentEstimate != null) {
+            renderEstimate();
+        }
+    }
+
+    private void setTaggedText(View view, String tag, String value) {
+        Object currentTag = view.getTag();
+        if (tag.equals(currentTag) && view instanceof TextView) {
+            ((TextView) view).setText(value);
+            return;
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int index = 0; index < group.getChildCount(); index++) {
+                setTaggedText(group.getChildAt(index), tag, value);
+            }
+        }
     }
 
     private void openCamera() {
@@ -212,7 +684,7 @@ public class MainActivity extends Activity {
         }
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (intent.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(this, "Kamera uygulaması bulunamadı.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, english ? "Camera app not found." : "Kamera uygulaması bulunamadı.", Toast.LENGTH_SHORT).show();
             return;
         }
         startActivityForResult(intent, REQUEST_CAPTURE);
@@ -229,7 +701,7 @@ public class MainActivity extends Activity {
         if (requestCode == REQUEST_CAMERA && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             openCamera();
         } else if (requestCode == REQUEST_CAMERA) {
-            Toast.makeText(this, "Fotoğraf çekmek için kamera izni gerekiyor.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, english ? "Camera permission is required." : "Fotoğraf çekmek için kamera izni gerekiyor.", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -255,48 +727,79 @@ public class MainActivity extends Activity {
                 }
             }
             if (bitmap == null) {
-                Toast.makeText(this, "Görsel okunamadı.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, english ? "Image could not be read." : "Görsel okunamadı.", Toast.LENGTH_SHORT).show();
                 return;
             }
+            switchScreen(SCREEN_ANALYSIS);
             foodImage.setImageBitmap(bitmap);
+            uploadPlaceholder.setVisibility(View.GONE);
+            homeSubtitle.setVisibility(View.GONE);
+            actionsLayout.setVisibility(View.GONE);
+            photoFrame.setVisibility(View.GONE);
+            final Bitmap analyzedBitmap = bitmap;
             currentFoodBitmap = bitmap;
             currentEstimate = FoodAnalyzer.analyze(bitmap);
             resultUnlocked = false;
             aiAnalysisInProgress = false;
-            lockedPanel.setVisibility(View.VISIBLE);
+            analysisPrepared = false;
+            analyzingPanel.setVisibility(View.VISIBLE);
+            lockedPanel.setVisibility(View.GONE);
             resultPanel.setVisibility(View.GONE);
-            statusText.setText("Analiz tamamlandı. Sonucu görmek için reklam izlemen gerekiyor.");
+            statusText.setText(english ? "AI is analyzing..." : "AI analiz ediyor...");
+            statusText.setVisibility(View.GONE);
             renderEstimate();
+            new Thread(() -> {
+                try {
+                    Thread.sleep(1200);
+                } catch (InterruptedException ignored) {
+                }
+                runOnUiThread(() -> {
+                    if (currentFoodBitmap == analyzedBitmap && !resultUnlocked && !aiAnalysisInProgress) {
+                        analysisPrepared = true;
+                        analyzingPanel.setVisibility(View.GONE);
+                        lockedPanel.setVisibility(View.VISIBLE);
+                        resultPanel.setVisibility(View.GONE);
+                        statusText.setText(english ? "Analysis ready. Watch an ad to see the result." : "Analiz hazır. Sonucu görmek için reklam izle.");
+                        statusText.setVisibility(View.GONE);
+                        renderEstimate();
+                    }
+                });
+            }).start();
         } catch (Exception exception) {
-            Toast.makeText(this, "Fotoğraf analiz edilirken sorun oluştu.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, english ? "There was a problem analyzing the photo." : "Fotoğraf analiz edilirken sorun oluştu.", Toast.LENGTH_SHORT).show();
         }
     }
 
     private void unlockResultAfterAd() {
         if (currentEstimate == null) {
-            Toast.makeText(this, "Önce bir yemek fotoğrafı çek.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, english ? "Take a food photo first." : "Önce bir yemek fotoğrafı çek.", Toast.LENGTH_SHORT).show();
             return;
         }
         watchAdButton.setEnabled(false);
-        watchAdButton.setText("AI analiz ediyor...");
+        watchAdButton.setText(english ? "AI is analyzing..." : "AI analiz ediyor...");
         requestAiEstimate();
     }
 
     private void renderEstimate() {
         if (currentEstimate == null) {
             foodNameText.setText("Henüz analiz yok");
-            confidenceText.setText("Fotoğraf çekildiğinde burada tahmini yemek türü görünecek.");
+            confidenceText.setText(english ? "The estimated food type will appear here." : "Fotoğraf çekildiğinde burada tahmini yemek türü görünecek.");
             caloriesText.setText("0 kcal");
             proteinText.setText("0 g");
             carbsText.setText("0 g");
             fatText.setText("0 g");
-            portionText.setText("Porsiyon: " + portionGrams + " g");
-            insightText.setText("Not: Bu uygulama tıbbi/nutrisyonel ölçüm yapmaz; yaklaşık fikir vermek için çalışır.");
+            portionText.setText(portionGrams + " g");
+            insightText.setText(english ? "Note: This app gives estimates only; it is not medical advice." : "Not: Bu uygulama tıbbi/nutrisyonel ölçüm yapmaz; yaklaşık fikir vermek için çalışır.");
             return;
         }
         if (!resultUnlocked) {
-            watchAdButton.setEnabled(!aiAnalysisInProgress);
-            watchAdButton.setText(aiAnalysisInProgress ? "AI analiz ediyor..." : "Reklam izle ve sonucu gör");
+            resultPanel.setVisibility(View.GONE);
+            if (analysisPrepared) {
+                watchAdButton.setEnabled(!aiAnalysisInProgress);
+                watchAdButton.setText(aiAnalysisInProgress
+                        ? (english ? "AI is analyzing..." : "AI analiz ediyor...")
+                        : (english ? "▶  Watch Ad and See Result" : "▶  Reklam İzle ve Sonucu Gör"));
+            }
             return;
         }
 
@@ -307,12 +810,12 @@ public class MainActivity extends Activity {
         int fat = (int) Math.round(currentEstimate.fatPer100g * factor);
 
         foodNameText.setText(currentEstimate.name);
-        confidenceText.setText(String.format(Locale.getDefault(), "Tahmini eşleşme: %%%d", currentEstimate.confidence));
+        confidenceText.setText(String.format(Locale.getDefault(), english ? "Estimated match: %%%d" : "Tahmini eşleşme: %%%d", currentEstimate.confidence));
         caloriesText.setText(calories + " kcal");
         proteinText.setText(protein + " g");
         carbsText.setText(carbs + " g");
         fatText.setText(fat + " g");
-        portionText.setText("Porsiyon: " + portionGrams + " g");
+        portionText.setText(portionGrams + " g");
         insightText.setText(currentEstimate.note);
     }
 
@@ -322,7 +825,8 @@ public class MainActivity extends Activity {
             return;
         }
         aiAnalysisInProgress = true;
-        statusText.setText("Reklam tamamlandı. Fotoğraf AI ile analiz ediliyor...");
+        statusText.setText(english ? "Ad completed. AI is analyzing the photo..." : "Reklam tamamlandı. Fotoğraf AI ile analiz ediliyor...");
+        statusText.setVisibility(View.GONE);
         new Thread(() -> {
             try {
                 FoodEstimate aiEstimate = AiFoodClient.analyze(currentFoodBitmap, BuildConfig.CALORIE_AI_ENDPOINT);
@@ -330,11 +834,15 @@ public class MainActivity extends Activity {
                     currentEstimate = aiEstimate;
                     portionGrams = aiEstimate.portionGrams;
                     portionSeekBar.setProgress(Math.max(0, Math.min(450, portionGrams - 50)));
-                    unlockWithCurrentEstimate("AI sonucu hazır. Porsiyonu değiştirerek değerleri güncelleyebilirsin.");
+                    unlockWithCurrentEstimate(english
+                            ? "AI result is ready. Adjust the portion to update values."
+                            : "AI sonucu hazır. Porsiyonu değiştirerek değerleri güncelleyebilirsin.");
                 });
             } catch (Exception exception) {
                 runOnUiThread(() -> unlockWithCurrentEstimate(
-                        "AI sunucusuna ulaşılamadı. Şimdilik telefondaki yedek tahmini gösteriyorum."
+                        english
+                                ? "AI server could not be reached. Showing the backup estimate for now."
+                                : "AI sunucusuna ulaşılamadı. Şimdilik telefondaki yedek tahmini gösteriyorum."
                 ));
             }
         }).start();
@@ -344,8 +852,15 @@ public class MainActivity extends Activity {
         aiAnalysisInProgress = false;
         resultUnlocked = true;
         lockedPanel.setVisibility(View.GONE);
+        analyzingPanel.setVisibility(View.GONE);
+        LinearLayout.LayoutParams photoParams = (LinearLayout.LayoutParams) photoFrame.getLayoutParams();
+        photoParams.height = dp(220);
+        photoParams.setMargins(0, 0, 0, dp(14));
+        photoFrame.setLayoutParams(photoParams);
+        photoFrame.setVisibility(View.VISIBLE);
         resultPanel.setVisibility(View.VISIBLE);
         statusText.setText(message);
+        statusText.setVisibility(View.GONE);
         renderEstimate();
     }
 
@@ -365,14 +880,54 @@ public class MainActivity extends Activity {
         return valueView;
     }
 
+    private TextView addMacroCard(LinearLayout parent, String glyph, String label, int iconBackground,
+                                  int iconColor, int leftMargin, int rightMargin) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setGravity(Gravity.CENTER);
+        card.setPadding(dp(6), dp(12), dp(6), dp(10));
+        card.setBackground(makeRoundRect(COLOR_SURFACE, dp(16), COLOR_MINT_SOFT));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(0, dp(120), 1f);
+        cardParams.setMargins(leftMargin, 0, rightMargin, 0);
+        parent.addView(card, cardParams);
+
+        TextView icon = text(glyph, 19, iconColor, Typeface.BOLD);
+        icon.setGravity(Gravity.CENTER);
+        icon.setBackground(makeRoundRect(iconBackground, dp(20), 0));
+        card.addView(icon, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        TextView labelView = text(label, 13, COLOR_MUTED, Typeface.NORMAL);
+        labelView.setGravity(Gravity.CENTER);
+        labelView.setPadding(0, dp(8), 0, dp(4));
+        card.addView(labelView);
+
+        TextView valueView = text("", 20, COLOR_TEXT, Typeface.BOLD);
+        valueView.setGravity(Gravity.CENTER);
+        card.addView(valueView);
+        return valueView;
+    }
+
     private Button actionButton(String label) {
         Button button = new Button(this);
         button.setAllCaps(false);
         button.setText(label);
-        button.setTextSize(15);
+        button.setTextSize(16);
         button.setTextColor(Color.WHITE);
         button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        button.setBackground(makeRoundRect(Color.rgb(41, 119, 84), dp(14), 0));
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(makeRoundRect(COLOR_PRIMARY_CONTAINER, dp(28), 0));
+        return button;
+    }
+
+    private Button secondaryButton(String label) {
+        Button button = new Button(this);
+        button.setAllCaps(false);
+        button.setText(label);
+        button.setTextSize(16);
+        button.setTextColor(Color.rgb(80, 104, 86));
+        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setGravity(Gravity.CENTER);
+        button.setBackground(makeRoundRect(Color.rgb(204, 230, 208), dp(16), 0));
         return button;
     }
 
@@ -393,8 +948,8 @@ public class MainActivity extends Activity {
         );
     }
 
-    private LinearLayout.LayoutParams weightedButtonParams(int leftMargin, int rightMargin) {
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, dp(52), 1f);
+    private LinearLayout.LayoutParams weightedButtonParams(int leftMargin, int rightMargin, int height) {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, height, 1f);
         params.setMargins(leftMargin, 0, rightMargin, 0);
         return params;
     }
@@ -405,6 +960,16 @@ public class MainActivity extends Activity {
         drawable.setCornerRadius(radius);
         if (strokeColor != 0) {
             drawable.setStroke(dp(1), strokeColor);
+        }
+        return drawable;
+    }
+
+    private GradientDrawable makeRoundRect(int fillColor, int radius, int strokeColor, int strokeWidth, int dashWidth) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(fillColor);
+        drawable.setCornerRadius(radius);
+        if (strokeColor != 0) {
+            drawable.setStroke(strokeWidth, strokeColor, dashWidth, dashWidth);
         }
         return drawable;
     }

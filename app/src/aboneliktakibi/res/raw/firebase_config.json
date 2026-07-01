@@ -1,0 +1,108 @@
+{
+  "project_info": {
+    "project_number": "279369816835",
+    "project_id": "galeri-takip",
+    "storage_bucket": "galeri-takip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279369816835:android:5ec4c8ec38b04b36c82736",
+        "android_client_info": {
+          "package_name": "com.dkonak.aboneliktakibi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "279369816835-a6phgr5u89ff68sovmdssmsd98rovp09.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.aboneliktakibi",
+            "certificate_hash": "0dc37a20d72a999404287d86e17e18a764d2c62a"
+          }
+        },
+        {
+          "client_id": "279369816835-bt90iejf5og4lgvl8r7ugejfso80a3mv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.aboneliktakibi",
+            "certificate_hash": "b83550ae35c09c1e5409e6e3e509a43690c0992d"
+          }
+        },
+        {
+          "client_id": "279369816835-fghvv5fagcpjhm89n35fn54rofmogr1q.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.aboneliktakibi",
+            "certificate_hash": "ab672a580ae3316e09aaee37fea7421890b17b7d"
+          }
+        },
+        {
+          "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKYRLmQ0A53huOqkf5rjw1u-l3VMLSDko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279369816835:android:349f3a2087c39d18c82736",
+        "android_client_info": {
+          "package_name": "com.dkonak.galeritakip"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "279369816835-i8l67635l9pmtpm4t92ug1jjuk1pv7rn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.galeritakip",
+            "certificate_hash": "b83550ae35c09c1e5409e6e3e509a43690c0992d"
+          }
+        },
+        {
+          "client_id": "279369816835-pec9l1l8s746kfvir232mfe8emchg4b0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.galeritakip",
+            "certificate_hash": "ab672a580ae3316e09aaee37fea7421890b17b7d"
+          }
+        },
+        {
+          "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKYRLmQ0A53huOqkf5rjw1u-l3VMLSDko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

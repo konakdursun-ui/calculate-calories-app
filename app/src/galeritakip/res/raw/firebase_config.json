@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "279369816835",
+    "project_id": "galeri-takip",
+    "storage_bucket": "galeri-takip.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:279369816835:android:349f3a2087c39d18c82736",
+        "android_client_info": {
+          "package_name": "com.dkonak.galeritakip"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "279369816835-i8l67635l9pmtpm4t92ug1jjuk1pv7rn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.galeritakip",
+            "certificate_hash": "b83550ae35c09c1e5409e6e3e509a43690c0992d"
+          }
+        },
+        {
+          "client_id": "279369816835-pec9l1l8s746kfvir232mfe8emchg4b0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.galeritakip",
+            "certificate_hash": "ab672a580ae3316e09aaee37fea7421890b17b7d"
+          }
+        },
+        {
+          "client_id": "279369816835-r8qrb807qcfk4nn3m1crshdp3tt2p3s0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.dkonak.galeritakip",
+            "certificate_hash": "fdf338ce6e514d3fb1e47a97e371dcd78da75f70"
+          }
+        },
+        {
+          "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBKYRLmQ0A53huOqkf5rjw1u-l3VMLSDko"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "279369816835-8302fll1qks4hc6apqstaquvuktase54.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

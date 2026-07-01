@@ -2,13 +2,17 @@ package com.dkonak.dartat;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.Rect;
 import android.graphics.RectF;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
+import android.net.Uri;
 import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
@@ -16,6 +20,7 @@ import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -29,12 +34,15 @@ public class PinGameView extends View {
     private static final String KEY_HIGHEST_UNLOCKED = "highest_unlocked_level";
     private static final String KEY_SELECTED_SKIN = "selected_skin";
     private static final String KEY_SELECTED_CORE = "selected_core";
+    private static final String KEY_CUSTOM_TARGET_URI = "custom_target_uri";
     private static final String KEY_LANGUAGE = "language";
     private static final String KEY_SKIN_UNLOCK_PREFIX = "skin_unlock_";
     private static final String KEY_CORE_UNLOCK_PREFIX = "core_unlock_";
     private static final long LEVEL_TRANSITION_DELAY_MS = 800L;
     private static final float SHOOT_SPEED_DP = 1080f;
     private static final float IMPACT_ANGLE_DEG = 90f;
+    private static final int INITIAL_PIN_COUNT = 5;
+    private static final int SHOTS_PER_LEVEL = 5;
     private static final boolean TEST_UNLOCK_ALL_LEVELS = true;
 
     private final Paint backgroundPaint = new Paint();
@@ -55,6 +63,7 @@ public class PinGameView extends View {
     private final Paint buttonTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint darkTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint coinPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint imagePaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
 
     private final List<LevelConfig> levels = createLevels();
     private final List<Float> attachedPinAngles = new ArrayList<>();
@@ -83,6 +92,7 @@ public class PinGameView extends View {
     private final Vibrator vibrator;
     private final ToneGenerator toneGenerator;
     private final RewardedContinueGateway rewardedContinueGateway;
+    private final CustomTargetImageGateway customTargetImageGateway;
 
     private float shootSpeedPx;
 
@@ -101,6 +111,7 @@ public class PinGameView extends View {
     private float shakeOffsetX;
     private String selectedSkinId = "needle";
     private String selectedCoreId = "classic";
+    private String customTargetUriString;
     private String currentLanguage = "tr";
     private String failOverlayMessage = "Istersen reklam izleyip kaldigin yerden devam et.";
     private boolean rewardedContinueUsed;
@@ -110,13 +121,22 @@ public class PinGameView extends View {
     private ScreenMode screenMode = ScreenMode.MENU;
     private ScreenMode previousScreenMode = ScreenMode.MENU;
     private GameStatus status = GameStatus.PLAYING;
+    private Bitmap customTargetBitmap;
+    private Bitmap appLogoBitmap;
+    private Bitmap gameBackgroundBitmap;
+    private Bitmap preparedBackgroundBitmap;
 
     public PinGameView(Context context, RewardedContinueGateway rewardedContinueGateway) {
+        this(context, rewardedContinueGateway, null);
+    }
+
+    public PinGameView(Context context, RewardedContinueGateway rewardedContinueGateway, CustomTargetImageGateway customTargetImageGateway) {
         super(context);
         preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         vibrator = (Vibrator) context.getSystemService(Context.VIBRATOR_SERVICE);
         toneGenerator = new ToneGenerator(AudioManager.STREAM_MUSIC, 70);
         this.rewardedContinueGateway = rewardedContinueGateway;
+        this.customTargetImageGateway = customTargetImageGateway;
         init();
     }
 
@@ -128,7 +148,11 @@ public class PinGameView extends View {
         selectedStartLevel = highestUnlockedLevel;
         selectedSkinId = preferences.getString(KEY_SELECTED_SKIN, "needle");
         selectedCoreId = preferences.getString(KEY_SELECTED_CORE, "classic");
+        customTargetUriString = preferences.getString(KEY_CUSTOM_TARGET_URI, null);
         currentLanguage = preferences.getString(KEY_LANGUAGE, "tr");
+        appLogoBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.dartat_app_logo);
+        gameBackgroundBitmap = BitmapFactory.decodeResource(getResources(), R.drawable.dartat_game_background);
+        loadCustomTargetBitmap();
 
         backgroundPaint.setColor(Color.rgb(237, 232, 222));
 
@@ -197,6 +221,9 @@ public class PinGameView extends View {
         if (!isCoreUnlocked(selectedCoreId)) {
             selectedCoreId = "classic";
         }
+        if ("custom".equals(selectedCoreId) && customTargetBitmap == null) {
+            selectedCoreId = "classic";
+        }
 
         setLayerType(LAYER_TYPE_SOFTWARE, cardPaint);
         resetProgress();
@@ -213,6 +240,16 @@ public class PinGameView extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         toneGenerator.release();
+        if (preparedBackgroundBitmap != null) {
+            preparedBackgroundBitmap.recycle();
+            preparedBackgroundBitmap = null;
+        }
+    }
+
+    @Override
+    protected void onSizeChanged(int width, int height, int oldWidth, int oldHeight) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight);
+        prepareBackgroundBitmap(width, height);
     }
 
     @Override
@@ -370,8 +407,8 @@ public class PinGameView extends View {
             hubRotation = normalizeAngle(hubRotation + hubRotationSpeed * dt);
             if (!inFlightShotProgresses.isEmpty()) {
                 float centerY = getHeight() * 0.38f;
-                float hubRadius = Math.min(getWidth(), getHeight()) * 0.095f;
-                float pinLength = Math.min(getWidth(), getHeight()) * 0.23f;
+                float hubRadius = gameScaleSize() * 0.095f;
+                float pinLength = gameScaleSize() * 0.23f;
                 float startY = getHeight() * 0.82f;
                 float targetY = centerY + hubRadius + pinLength;
                 for (int i = inFlightShotProgresses.size() - 1; i >= 0; i--) {
@@ -433,8 +470,6 @@ public class PinGameView extends View {
             vibrate(35);
             playTone(ToneGenerator.TONE_PROP_ACK, 120);
             persistProgress();
-        } else {
-            persistProgress();
         }
         invalidate();
     }
@@ -448,9 +483,9 @@ public class PinGameView extends View {
     private boolean isShotCollidingWithPin(float localAngle) {
         float centerX = getWidth() / 2f;
         float centerY = getHeight() * 0.38f;
-        float hubRadius = Math.min(getWidth(), getHeight()) * 0.095f;
-        float pinLength = Math.min(getWidth(), getHeight()) * 0.23f;
-        float pinBallRadius = Math.min(getWidth(), getHeight()) * 0.03f;
+        float hubRadius = gameScaleSize() * 0.095f;
+        float pinLength = gameScaleSize() * 0.23f;
+        float pinBallRadius = gameScaleSize() * 0.03f;
 
         float shotEndX = centerX;
         float shotEndY = centerY + hubRadius + pinLength;
@@ -463,35 +498,38 @@ public class PinGameView extends View {
     }
 
     private void drawBackground(Canvas canvas) {
-        canvas.drawRect(0f, 0f, getWidth(), getHeight(), backgroundPaint);
-        Paint glowPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        glowPaint.setColor(Color.argb(45, 196, 92, 67));
-        canvas.drawCircle(getWidth() * 0.16f, getHeight() * 0.16f, dp(54f), glowPaint);
-        glowPaint.setColor(Color.argb(38, 51, 96, 132));
-        canvas.drawCircle(getWidth() * 0.82f, getHeight() * 0.2f, dp(62f), glowPaint);
-        glowPaint.setColor(Color.argb(26, 0, 0, 0));
-        canvas.drawCircle(getWidth() * 0.12f, getHeight() * 0.12f, dp(24f), glowPaint);
-        canvas.drawCircle(getWidth() * 0.87f, getHeight() * 0.18f, dp(18f), glowPaint);
-        canvas.drawCircle(getWidth() * 0.16f, getHeight() * 0.82f, dp(15f), glowPaint);
-        canvas.drawCircle(getWidth() * 0.88f, getHeight() * 0.84f, dp(22f), glowPaint);
+        if (preparedBackgroundBitmap != null) {
+            canvas.drawBitmap(preparedBackgroundBitmap, 0f, 0f, null);
+        } else {
+            canvas.drawRect(0f, 0f, getWidth(), getHeight(), backgroundPaint);
+        }
 
         if (screenMode != ScreenMode.GAME) {
             Paint topBarPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
             topBarPaint.setColor(Color.argb(30, 34, 45, 58));
-            canvas.drawRoundRect(new RectF(getWidth() * 0.07f, getHeight() * 0.075f, getWidth() * 0.93f, getHeight() * 0.092f), dp(14f), dp(14f), topBarPaint);
+            float topBarWidth = panelWidth(0.86f, 540f);
+            float topBarLeft = (getWidth() - topBarWidth) / 2f;
+            canvas.drawRoundRect(new RectF(topBarLeft, getHeight() * 0.075f, topBarLeft + topBarWidth, getHeight() * 0.092f), dp(14f), dp(14f), topBarPaint);
         }
     }
 
     private void drawMenu(Canvas canvas) {
         float centerX = getWidth() / 2f;
-        float width = getWidth() * 0.86f;
+        float width = panelWidth(0.86f, 520f);
         float left = (getWidth() - width) / 2f;
         float top = getHeight() * 0.1f;
         float bottom = getHeight() * 0.9f;
         overlayRect.set(left, top, left + width, bottom);
         canvas.drawRoundRect(overlayRect, dp(28f), dp(28f), cardPaint);
 
-        canvas.drawText(t("app_title"), centerX, top + dp(56f), headingPaint);
+        if (appLogoBitmap != null) {
+            drawAppLogo(canvas, centerX, top + dp(44f), dp(52f));
+            Paint menuTitlePaint = new Paint(headingPaint);
+            menuTitlePaint.setTextSize(sp(24f));
+            canvas.drawText(t("app_title"), centerX, top + dp(94f), menuTitlePaint);
+        } else {
+            canvas.drawText(t("app_title"), centerX, top + dp(56f), headingPaint);
+        }
 
         drawTopStat(canvas, left + dp(98f), top + dp(128f), t("score_short"), String.valueOf(bestScore));
         drawTopStat(canvas, left + width - dp(98f), top + dp(128f), t("coins_short"), String.valueOf(coins));
@@ -534,7 +572,7 @@ public class PinGameView extends View {
 
     private void drawSkinSelection(Canvas canvas) {
         float centerX = getWidth() / 2f;
-        float width = getWidth() * 0.86f;
+        float width = panelWidth(0.86f, 540f);
         float left = (getWidth() - width) / 2f;
         float top = getHeight() * 0.08f;
         float bottom = getHeight() * 0.88f;
@@ -552,7 +590,7 @@ public class PinGameView extends View {
 
     private void drawCoreSelection(Canvas canvas) {
         float centerX = getWidth() / 2f;
-        float width = getWidth() * 0.86f;
+        float width = panelWidth(0.86f, 540f);
         float left = (getWidth() - width) / 2f;
         float top = getHeight() * 0.08f;
         float bottom = getHeight() * 0.88f;
@@ -570,7 +608,7 @@ public class PinGameView extends View {
 
     private void drawSettings(Canvas canvas) {
         float centerX = getWidth() / 2f;
-        float width = getWidth() * 0.82f;
+        float width = panelWidth(0.82f, 500f);
         float left = (getWidth() - width) / 2f;
         float top = getHeight() * 0.18f;
         float bottom = getHeight() * 0.82f;
@@ -593,7 +631,7 @@ public class PinGameView extends View {
         canvas.drawRect(0f, 0f, getWidth(), getHeight(), overlayPaint);
 
         float centerX = getWidth() / 2f;
-        float cardWidth = getWidth() * 0.82f;
+        float cardWidth = panelWidth(0.82f, 500f);
         float cardHeight = dp(290f);
         float left = (getWidth() - cardWidth) / 2f;
         float top = (getHeight() - cardHeight) / 2f;
@@ -618,9 +656,9 @@ public class PinGameView extends View {
     private void drawGame(Canvas canvas) {
         float centerX = getWidth() / 2f;
         float centerY = getHeight() * 0.38f;
-        float hubRadius = Math.min(getWidth(), getHeight()) * 0.095f;
-        float pinLength = Math.min(getWidth(), getHeight()) * 0.23f;
-        float tipRadius = Math.min(getWidth(), getHeight()) * 0.03f;
+        float hubRadius = gameScaleSize() * 0.095f;
+        float pinLength = gameScaleSize() * 0.23f;
+        float tipRadius = gameScaleSize() * 0.03f;
         LevelConfig level = levels.get(levelIndex);
 
         drawHud(canvas, level);
@@ -681,7 +719,7 @@ public class PinGameView extends View {
         int visibleShots = Math.min(shotsRemaining, 12);
         for (int i = 0; i < visibleShots; i++) {
             float y = queueStartY + i * spacing;
-            drawFlyingProjectile(canvas, centerX, y, Math.min(getWidth(), getHeight()) * 0.17f, tipRadius);
+            drawFlyingProjectile(canvas, centerX, y, gameScaleSize() * 0.17f, tipRadius);
         }
         Paint countPaint = new Paint(titlePaint);
         countPaint.setTextAlign(Paint.Align.LEFT);
@@ -776,7 +814,9 @@ public class PinGameView extends View {
         ring.setColor(Color.argb(95, 28, 36, 44));
         canvas.drawCircle(centerX, centerY, hubRadius * 1.02f, ring);
 
-        if ("soccer".equals(coreStyle.id)) {
+        if ("custom".equals(coreStyle.id) && customTargetBitmap != null) {
+            drawCustomImageCore(canvas, centerX, centerY, hubRadius);
+        } else if ("soccer".equals(coreStyle.id)) {
             drawSoccerCore(canvas, centerX, centerY, hubRadius);
         } else if ("basketball".equals(coreStyle.id)) {
             drawBasketballCore(canvas, centerX, centerY, hubRadius);
@@ -801,7 +841,11 @@ public class PinGameView extends View {
         Paint levelText = new Paint(labelPaint);
         levelText.setTextSize(sp(22f));
         levelText.setColor("tennis".equals(coreStyle.id) || "baseball".equals(coreStyle.id) ? Color.BLACK : Color.WHITE);
+        if ("custom".equals(coreStyle.id) && customTargetBitmap != null) {
+            levelText.setShadowLayer(dp(3f), 0f, dp(1f), Color.argb(180, 0, 0, 0));
+        }
         drawCenteredText(canvas, String.valueOf(levelNumber), centerX, centerY, levelText);
+        levelText.clearShadowLayer();
     }
 
     private void drawInfoRow(Canvas canvas, RectF rect, String label, String value) {
@@ -893,9 +937,26 @@ public class PinGameView extends View {
         canvas.drawArc(oval2, 95f, 170f, false, seam);
     }
 
+    private void drawCustomImageCore(Canvas canvas, float centerX, float centerY, float hubRadius) {
+        RectF target = new RectF(centerX - hubRadius, centerY - hubRadius, centerX + hubRadius, centerY + hubRadius);
+        Path circle = new Path();
+        circle.addCircle(centerX, centerY, hubRadius, Path.Direction.CW);
+
+        canvas.save();
+        canvas.clipPath(circle);
+        canvas.drawBitmap(customTargetBitmap, null, target, null);
+        canvas.restore();
+
+        Paint border = new Paint(Paint.ANTI_ALIAS_FLAG);
+        border.setStyle(Paint.Style.STROKE);
+        border.setStrokeWidth(dp(2.2f));
+        border.setColor(Color.argb(150, 255, 255, 255));
+        canvas.drawCircle(centerX, centerY, hubRadius * 0.98f, border);
+    }
+
     private void drawStatusOverlay(Canvas canvas, String title, String subtitle) {
         canvas.drawRect(0f, 0f, getWidth(), getHeight(), overlayPaint);
-        float width = getWidth() * 0.76f;
+        float width = panelWidth(0.76f, 480f);
         float height = dp(150f);
         float left = (getWidth() - width) / 2f;
         float top = (getHeight() - height) / 2f;
@@ -917,7 +978,7 @@ public class PinGameView extends View {
 
     private void drawFailOverlay(Canvas canvas) {
         canvas.drawRect(0f, 0f, getWidth(), getHeight(), overlayPaint);
-        float width = getWidth() * 0.84f;
+        float width = panelWidth(0.84f, 520f);
         float height = dp(rewardedContinueUsed ? 300f : 292f);
         float left = (getWidth() - width) / 2f;
         float top = (getHeight() - height) / 2f;
@@ -961,7 +1022,7 @@ public class PinGameView extends View {
 
     private void drawPauseOverlay(Canvas canvas) {
         canvas.drawRect(0f, 0f, getWidth(), getHeight(), overlayPaint);
-        float width = getWidth() * 0.76f;
+        float width = panelWidth(0.76f, 480f);
         float height = dp(190f);
         float left = (getWidth() - width) / 2f;
         float top = (getHeight() - height) / 2f;
@@ -1079,7 +1140,9 @@ public class PinGameView extends View {
             float cx = rect.left + dp(34f);
             float cy = rect.centerY();
             float radius = dp(16f);
-            if ("soccer".equals(core.id)) {
+            if ("custom".equals(core.id) && customTargetBitmap != null) {
+                drawCustomImageCore(canvas, cx, cy, radius);
+            } else if ("soccer".equals(core.id)) {
                 drawSoccerCore(canvas, cx, cy, radius);
             } else if ("basketball".equals(core.id)) {
                 drawBasketballCore(canvas, cx, cy, radius);
@@ -1099,9 +1162,18 @@ public class PinGameView extends View {
             Paint infoPaint = new Paint(bodyPaint);
             infoPaint.setTextAlign(Paint.Align.LEFT);
             infoPaint.setTextSize(sp(12f));
-            String state = isCoreUnlocked(core.id)
-                    ? (core.id.equals(selectedCoreId) ? t("selected") : t("tap_select"))
-                    : core.cost + " " + t("coins_short");
+            String state;
+            if ("custom".equals(core.id)) {
+                if (customTargetBitmap == null) {
+                    state = t("choose_photo");
+                } else {
+                    state = core.id.equals(selectedCoreId) ? t("change_photo") : t("tap_select");
+                }
+            } else {
+                state = isCoreUnlocked(core.id)
+                        ? (core.id.equals(selectedCoreId) ? t("selected") : t("tap_select"))
+                        : core.cost + " " + t("coins_short");
+            }
             canvas.drawText(state, rect.left + dp(60f), rect.top + dp(56f), infoPaint);
         }
     }
@@ -1110,6 +1182,16 @@ public class PinGameView extends View {
         for (CoreStyle core : coreStyles) {
             RectF rect = coreRects.get(core.id);
             if (rect != null && rect.contains(x, y)) {
+                if ("custom".equals(core.id)) {
+                    if (customTargetBitmap == null || core.id.equals(selectedCoreId)) {
+                        requestCustomTargetImage();
+                    } else {
+                        selectedCoreId = core.id;
+                        persistProgress();
+                        playTone(ToneGenerator.TONE_PROP_ACK, 70);
+                    }
+                    return;
+                }
                 if (isCoreUnlocked(core.id)) {
                     selectedCoreId = core.id;
                     persistProgress();
@@ -1145,10 +1227,58 @@ public class PinGameView extends View {
         rect.set(centerX - width / 2f, centerY - height / 2f, centerX + width / 2f, centerY + height / 2f);
     }
 
+    private void drawAppLogo(Canvas canvas, float centerX, float centerY, float size) {
+        RectF logoRect = new RectF(centerX - size / 2f, centerY - size / 2f, centerX + size / 2f, centerY + size / 2f);
+        canvas.save();
+        Path clip = new Path();
+        clip.addRoundRect(logoRect, size * 0.22f, size * 0.22f, Path.Direction.CW);
+        canvas.clipPath(clip);
+        canvas.drawBitmap(appLogoBitmap, null, logoRect, imagePaint);
+        canvas.restore();
+    }
+
+    private void prepareBackgroundBitmap(int width, int height) {
+        if (preparedBackgroundBitmap != null) {
+            preparedBackgroundBitmap.recycle();
+            preparedBackgroundBitmap = null;
+        }
+        if (width <= 0 || height <= 0 || gameBackgroundBitmap == null) {
+            return;
+        }
+
+        preparedBackgroundBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565);
+        Canvas backgroundCanvas = new Canvas(preparedBackgroundBitmap);
+        drawBitmapCover(backgroundCanvas, gameBackgroundBitmap, new RectF(0f, 0f, width, height), imagePaint);
+    }
+
+    private void drawBitmapCover(Canvas canvas, Bitmap bitmap, RectF destination, Paint paint) {
+        float bitmapRatio = bitmap.getWidth() / (float) bitmap.getHeight();
+        float destinationRatio = destination.width() / destination.height();
+        Rect source;
+        if (bitmapRatio > destinationRatio) {
+            float sourceWidth = bitmap.getHeight() * destinationRatio;
+            float sourceLeft = (bitmap.getWidth() - sourceWidth) / 2f;
+            source = new Rect(Math.round(sourceLeft), 0, Math.round(sourceLeft + sourceWidth), bitmap.getHeight());
+        } else {
+            float sourceHeight = bitmap.getWidth() / destinationRatio;
+            float sourceTop = (bitmap.getHeight() - sourceHeight) / 2f;
+            source = new Rect(0, Math.round(sourceTop), bitmap.getWidth(), Math.round(sourceTop + sourceHeight));
+        }
+        canvas.drawBitmap(bitmap, source, destination, paint);
+    }
+
     private void drawCenteredText(Canvas canvas, String text, float cx, float cy, Paint paint) {
         Paint.FontMetrics metrics = paint.getFontMetrics();
         float baseline = cy - (metrics.ascent + metrics.descent) / 2f;
         canvas.drawText(text, cx, baseline, paint);
+    }
+
+    private float panelWidth(float screenRatio, float maxDp) {
+        return Math.min(getWidth() * screenRatio, dp(maxDp));
+    }
+
+    private float gameScaleSize() {
+        return Math.min(Math.min(getWidth(), getHeight()), dp(720f));
     }
 
     private void startNewRun() {
@@ -1215,6 +1345,7 @@ public class PinGameView extends View {
 
     private void loadLevel(int index) {
         levelIndex = Math.max(0, Math.min(index, levels.size() - 1));
+        selectedStartLevel = Math.min(getMaxSelectableLevel(), levelIndex + 1);
         LevelConfig config = levels.get(levelIndex);
         attachedPinAngles.clear();
         attachedPinAngles.addAll(config.initialAngles);
@@ -1231,7 +1362,7 @@ public class PinGameView extends View {
 
     private void unlockNextLevel(int unlockedLevel) {
         highestUnlockedLevel = Math.max(highestUnlockedLevel, Math.min(unlockedLevel, levels.size()));
-        selectedStartLevel = Math.min(getMaxSelectableLevel(), Math.max(selectedStartLevel, 1));
+        selectedStartLevel = Math.min(getMaxSelectableLevel(), Math.max(selectedStartLevel, highestUnlockedLevel));
     }
 
     private int getMaxSelectableLevel() {
@@ -1285,8 +1416,63 @@ public class PinGameView extends View {
                 .putInt(KEY_HIGHEST_UNLOCKED, highestUnlockedLevel)
                 .putString(KEY_SELECTED_SKIN, selectedSkinId)
                 .putString(KEY_SELECTED_CORE, selectedCoreId)
+                .putString(KEY_CUSTOM_TARGET_URI, customTargetUriString)
                 .putString(KEY_LANGUAGE, currentLanguage)
                 .apply();
+    }
+
+    public void setCustomTargetImage(Uri imageUri) {
+        customTargetUriString = imageUri == null ? null : imageUri.toString();
+        loadCustomTargetBitmap();
+        selectedCoreId = "custom";
+        unlockCore("custom");
+        persistProgress();
+        playTone(ToneGenerator.TONE_PROP_ACK, 100);
+        invalidate();
+    }
+
+    private void requestCustomTargetImage() {
+        if (customTargetImageGateway != null) {
+            customTargetImageGateway.openCustomTargetImagePicker();
+        } else {
+            triggerFailureFeedback();
+        }
+    }
+
+    private void loadCustomTargetBitmap() {
+        if (customTargetBitmap != null) {
+            customTargetBitmap.recycle();
+            customTargetBitmap = null;
+        }
+        if (customTargetUriString == null || customTargetUriString.trim().isEmpty()) {
+            return;
+        }
+        Uri imageUri = Uri.parse(customTargetUriString);
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream boundsStream = getContext().getContentResolver().openInputStream(imageUri)) {
+            BitmapFactory.decodeStream(boundsStream, null, bounds);
+        } catch (Exception ignored) {
+            customTargetUriString = null;
+            return;
+        }
+
+        BitmapFactory.Options decodeOptions = new BitmapFactory.Options();
+        decodeOptions.inSampleSize = calculateImageSampleSize(bounds.outWidth, bounds.outHeight, 1024);
+        try (InputStream imageStream = getContext().getContentResolver().openInputStream(imageUri)) {
+            customTargetBitmap = BitmapFactory.decodeStream(imageStream, null, decodeOptions);
+        } catch (Exception ignored) {
+            customTargetUriString = null;
+        }
+    }
+
+    private int calculateImageSampleSize(int width, int height, int maxSize) {
+        int sampleSize = 1;
+        int largestSide = Math.max(width, height);
+        while (largestSide / sampleSize > maxSize) {
+            sampleSize *= 2;
+        }
+        return sampleSize;
     }
 
     private void triggerFailureFeedback() {
@@ -1347,21 +1533,10 @@ public class PinGameView extends View {
     private List<LevelConfig> createLevels() {
         List<LevelConfig> configs = new ArrayList<>();
         for (int i = 1; i <= 500; i++) {
-            int shotCount = Math.min(30, 4 + ((i - 1) / 10));
-            int initialPinCount = Math.min(12, 3 + ((i - 1) / 18));
-            float speed = 66f + ((i - 1) * 0.78f);
-            if (i > 60) {
-                speed += (i - 60) * 0.18f;
-            }
-            if (i > 150) {
-                speed += (i - 150) * 0.12f;
-            }
-            if ((i / 3) % 2 == 1) {
-                speed *= -1f;
-            }
+            float speed = 40f + ((i - 1) * 0.26f);
             int clearBonus = 12 + (i * 3);
             int coinReward = 3;
-            configs.add(new LevelConfig(i, shotCount, speed, clearBonus, coinReward, generateAngles(initialPinCount, i)));
+            configs.add(new LevelConfig(i, SHOTS_PER_LEVEL, speed, clearBonus, coinReward, generateAngles(INITIAL_PIN_COUNT, i)));
         }
         return configs;
     }
@@ -1390,6 +1565,7 @@ public class PinGameView extends View {
     private List<CoreStyle> createCoreStyles() {
         List<CoreStyle> list = new ArrayList<>();
         list.add(new CoreStyle("classic", 0));
+        list.add(new CoreStyle("custom", 0));
         list.add(new CoreStyle("soccer", 45));
         list.add(new CoreStyle("basketball", 55));
         list.add(new CoreStyle("tennis", 70));
@@ -1464,6 +1640,8 @@ public class PinGameView extends View {
                 return t("core_tennis");
             case "baseball":
                 return t("core_baseball");
+            case "custom":
+                return t("core_custom");
             default:
                 return t("core_classic");
         }
@@ -1482,7 +1660,7 @@ public class PinGameView extends View {
         boolean en = "en".equals(currentLanguage);
         switch (key) {
             case "app_title":
-                return en ? "Dart Spin" : "Dart At";
+                return "Dart At";
             case "menu_subtitle":
                 return en ? "A polished orbit challenge with unlockable styles" : "Acilan stillere sahip daha rafine bir orbit deneyimi";
             case "score_short":
@@ -1528,7 +1706,7 @@ public class PinGameView extends View {
             case "choose_core":
                 return en ? "Choose Core" : "Merkez Sec";
             case "core_hint":
-                return en ? "Unlock ball styles and set the center look." : "Top stillerini ac, merkez gorunumu sec.";
+                return en ? "Choose a ball style or add a gallery photo to the center." : "Top stili sec veya merkeze galeriden resim ekle.";
             case "back":
                 return en ? "Back" : "Geri";
             case "run_complete":
@@ -1595,6 +1773,12 @@ public class PinGameView extends View {
                 return en ? "Tennis Ball" : "Tenis Topu";
             case "core_baseball":
                 return en ? "Baseball" : "Beyzbol Topu";
+            case "core_custom":
+                return en ? "Custom Photo" : "Ozel Resim";
+            case "choose_photo":
+                return en ? "Choose photo" : "Resim sec";
+            case "change_photo":
+                return en ? "Tap to change" : "Degistirmek icin dokun";
             default:
                 return key;
         }
@@ -1721,5 +1905,9 @@ public class PinGameView extends View {
         void onRewardEarned();
 
         void onAdUnavailable();
+    }
+
+    public interface CustomTargetImageGateway {
+        void openCustomTargetImagePicker();
     }
 }
